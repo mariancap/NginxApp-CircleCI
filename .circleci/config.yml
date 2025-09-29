@@ -1,16 +1,13 @@
 version: 2.1
 jobs:
-  build:
+  build_and_push:
     working_directory: ~/CircleCi
     docker:
-      - image: cimg/base:2022.09
-        auth:
-          username: $DOCKER_HUB_USER_ID
-          password: $DOCKER_HUB_PWD
+      - image: cimg/base:stable
     steps:
       - checkout
       - setup_remote_docker:
-          docker_layer_caching: true
+          version: 24.0.5
       # - run:
       #     name: Run tests
       #     command: |
@@ -25,3 +22,53 @@ jobs:
             TAG=latest
             echo $DOCKER_HUB_PWD | docker login -u $DOCKER_HUB_USER_ID --password-stdin
             docker push $DOCKER_HUB_USER_ID/nginx-app-marian:$TAG
+  deploy_vm:
+    docker:
+      - image: cimg/base:stable
+    steps:
+      - add_ssh_keys
+      - run:
+          name: Deploy over SSH (blue/green simplu)
+          command: |
+            IMAGE="${DOCKER_HUB_USER_ID}/nginx-app-marian:latest}"
+            ssh -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s << 'EOF'
+              set -euo pipefail
+              APP="nginx-static"
+              IMAGE="__IMAGE__"
+
+              docker pull "$IMAGE"
+
+              # rulează noul container pe port alternativ
+              docker rm -f ${APP}_new 2>/dev/null || true
+              docker run -d --name ${APP}_new -p 8081:80 --restart unless-stopped "$IMAGE"
+
+              # healthcheck simplu
+              for i in {1..20}; do
+                if curl -fsS http://localhost:8081/ >/dev/null; then break; fi
+                sleep 1
+              done
+
+              # comută pe portul stabil
+              docker rm -f ${APP}_current 2>/dev/null || true
+              docker rm -f ${APP} 2>/dev/null || true
+              docker rm -f ${APP}_new || true
+              docker run -d --name ${APP}_current -p 8080:80 --restart unless-stopped "$IMAGE"
+            EOF
+          environment:
+            # injectăm valoarea locală în script
+            IMAGE: "${DOCKER_HUB_USER_ID}/nginx-app-marian:latest"
+          no_output_timeout: 20m
+
+workflows:
+  build_test_deploy:
+    jobs:
+      - build_and_push:
+          filters:
+            branches:
+              only: main
+      - deploy_vm:
+          requires:
+            - build_and_push
+          filters:
+            branches:
+              only: main
