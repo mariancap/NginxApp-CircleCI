@@ -10,7 +10,11 @@ jobs:
       - run:
           name: Install dependecies
           command: |
+            apk add sudo
             apk add --no-cache python3 py3-pip
+            pip install virtualenv
+            virtualenv venv
+            source venv/bin/activate
             pip install --upgrade setuptools wheel
             pip install Cython
             sudo apt-get install build-essential
