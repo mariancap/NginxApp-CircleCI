@@ -11,4 +11,11 @@ jobs:
           name: Install dependecies
           command: |
             apk add --no-cache python3 py3-pip
+            pip install --upgrade pip setuptools
             pip3 install docker-compose
+      - deploy:
+          name: Push application Docker Image
+          command: |
+            docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER_ID -p $DOCKERHUB_HUB_PWD
+            docker build -t mariancap/nginx-circleci:latest .
+            docker push mariancap/nginx-circleci:latest
