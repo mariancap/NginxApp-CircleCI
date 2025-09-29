@@ -11,7 +11,9 @@ jobs:
           name: Install dependecies
           command: |
             apk add --no-cache python3 py3-pip
-            pip install --upgrade pip setuptools
+            pip install --upgrade setuptools wheel
+            pip install Cython
+            sudo apt-get install build-essential
             pip3 install docker-compose
       - deploy:
           name: Push application Docker Image
