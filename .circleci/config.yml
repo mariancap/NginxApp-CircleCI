@@ -30,21 +30,23 @@ jobs:
       - run:
           name: Deploy over SSH (blue/green simplu)
           command: |
-            IMAGE="${DOCKER_HUB_USER_ID}/nginx-app-marian:latest}"
-            ssh -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" bash -s << 'EOF'
+            IMAGE="${DOCKER_HUB_USER_ID}/nginx-app-marian:latest"
+            ssh -o StrictHostKeyChecking=no "${DEPLOY_USER}@${DEPLOY_HOST}" "IMAGE=$IMAGE bash -s" \<< 'EOF'
               set -euo pipefail
               APP="nginx-static"
-              IMAGE="__IMAGE__"
 
               docker pull "$IMAGE"
 
-              # rulează noul container pe port alternativ
+              # pornește noul container pe port alternativ
               docker rm -f ${APP}_new 2>/dev/null || true
               docker run -d --name ${APP}_new -p 8081:80 --restart unless-stopped "$IMAGE"
 
               # healthcheck simplu
               for i in {1..20}; do
-                if curl -fsS http://localhost:8081/ >/dev/null; then break; fi
+                if curl -fsS http://localhost:8081/ >/dev/null; then
+                  echo "New container healthy."
+                  break
+                fi
                 sleep 1
               done
 
@@ -54,9 +56,6 @@ jobs:
               docker rm -f ${APP}_new || true
               docker run -d --name ${APP}_current -p 8080:80 --restart unless-stopped "$IMAGE"
             EOF
-          environment:
-            # injectăm valoarea locală în script
-            IMAGE: "${DOCKER_HUB_USER_ID}/nginx-app-marian:latest"
           no_output_timeout: 20m
 
 workflows:
