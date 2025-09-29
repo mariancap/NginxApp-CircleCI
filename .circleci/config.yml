@@ -1,27 +1,27 @@
 version: 2.1
 jobs:
   build:
-    working_directory: /CircleCi
+    working_directory: ~/CircleCi
     docker:
-      - image: docker:20.10.16
+      - image: cimg/base:2022.09
+        auth:
+          username: $DOCKER_HUB_USER_ID
+          password: $DOCKER_HUB_PWD
     steps:
       - checkout
-      - setup_remote_docker
+      - setup_remote_docker:
+          docker_layer_caching: true
+      # - run:
+      #     name: Run tests
+      #     command: |
+      #       docker-compose -f ./docker-compose.test.yml up
       - run:
-          name: Install dependecies
+          name: Build Docker image
           command: |
-            apk add sudo
-            apk add --no-cache python3 py3-pip
-            pip install virtualenv
-            virtualenv venv
-            source venv/bin/activate
-            pip install --upgrade setuptools wheel
-            pip install Cython
-            sudo apt-get install build-essential
-            pip3 install docker-compose
-      - deploy:
-          name: Push application Docker Image
+            docker build -t $DOCKER_HUB_USER_ID/nginx-app-marian:latest .
+      - run:
+          name: Push application Docker image
           command: |
-            docker login -e $DOCKER_HUB_EMAIL -u $DOCKER_HUB_USER_ID -p $DOCKERHUB_HUB_PWD
-            docker build -t mariancap/nginx-circleci:latest .
-            docker push mariancap/nginx-circleci:latest
+            TAG=latest
+            echo $DOCKER_HUB_PWD | docker login -u $DOCKER_HUB_USER_ID --password-stdin
+            docker push $DOCKER_HUB_USER_ID/nginx-app-marian:$TAG
